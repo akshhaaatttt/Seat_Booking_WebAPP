@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Banner, Loading, StreamIndicator } from '../components/Feedback';
+import { Banner, Loading } from '../components/Feedback';
 import { SeatLegend, SeatMapView, TierPrices } from '../components/SeatMapView';
 import { useAuth } from '../hooks/useAuth';
 import { useCountdown } from '../hooks/useCountdown';
-import { useSeatStream } from '../hooks/useSeatStream';
 import { ApiError, api } from '../services/api';
 import { formatCountdown, formatDateTime, formatMoney } from '../utils/format';
-import type { Hold, Seat, SeatMap, SeatStatusChangedEvent } from '../types';
+import type { Booking, Hold, Seat, SeatMap } from '../types';
 
 /** Below this the countdown turns red. */
 const URGENT_MS = 60_000;
@@ -24,6 +23,7 @@ export function SeatSelectionPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<'holding' | 'booking' | 'releasing' | null>(null);
+  const [confirmed, setConfirmed] = useState<Booking | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!showId) return;
@@ -49,52 +49,6 @@ export function SeatSelectionPage() {
    * display optimisation: every action is still validated by the server, and a
    * reconnect re-fetches the authoritative map.
    */
-  const applySeatEvent = useCallback(
-    (event: SeatStatusChangedEvent) => {
-      setSeatMap((current) => {
-        if (!current || current.show.id !== event.showId) return current;
-
-        let changed = false;
-        const rows = current.rows.map((row) => ({
-          ...row,
-          seats: row.seats.map((seat) => {
-            if (seat.showSeatId !== event.showSeatId || seat.status === event.status) return seat;
-            changed = true;
-            return {
-              ...seat,
-              status: event.status,
-              heldByMe: event.status === 'HELD' && event.holdUserId === user?.id,
-              holdExpiresAt: event.holdExpiresAt,
-            };
-          }),
-        }));
-        if (!changed) return current;
-
-        const counts = { AVAILABLE: 0, HELD: 0, BOOKED: 0 };
-        for (const row of rows) for (const seat of row.seats) counts[seat.status] += 1;
-        return { ...current, rows, legendCounts: counts };
-      });
-
-      // If a seat we had merely *selected* was taken by someone else, drop it
-      // and say so rather than letting the user submit a doomed request.
-      if (event.status !== 'AVAILABLE' && event.holdUserId !== user?.id) {
-        setSelected((current) => {
-          if (!current.has(event.showSeatId)) return current;
-          const next = new Set(current);
-          next.delete(event.showSeatId);
-          setNotice(`Seat ${event.label} was just taken by someone else.`);
-          return next;
-        });
-      }
-    },
-    [user?.id],
-  );
-
-  const streamStatus = useSeatStream(showId, {
-    onSeatChange: applySeatEvent,
-    // Events may have been missed while disconnected, so resync from the server.
-    onReconnect: () => void refresh(),
-  });
 
   const seatsById = useMemo(() => {
     const map = new Map<string, Seat>();
@@ -166,7 +120,9 @@ export function SeatSelectionPage() {
     setError(null);
     try {
       const booking = await api.confirmBooking(showId, hold.holdGroupId);
-      navigate(`/bookings/${booking.id}`, { state: { justBooked: true } });
+      setConfirmed(booking);
+      setHold(null);
+      await refresh();
     } catch (caught) {
       if (caught instanceof ApiError) {
         setError(caught.message);
@@ -231,7 +187,6 @@ export function SeatSelectionPage() {
             {formatDateTime(show.startsAt)} · {show.screen}
           </p>
         </div>
-        <StreamIndicator status={streamStatus} />
       </div>
 
       <div className="booking-layout">
@@ -243,12 +198,33 @@ export function SeatSelectionPage() {
 
         <aside className="card summary" aria-label="Your selection">
           <div className="summary-head">
-            <h2>{hold ? 'Your held seats' : 'Your selection'}</h2>
+            <h2>{confirmed ? 'Booking confirmed' : hold ? 'Your held seats' : 'Your selection'}</h2>
           </div>
 
           <div className="summary-body">
             {error && <Banner kind="error" onDismiss={() => setError(null)}>{error}</Banner>}
             {notice && <Banner kind="warn" onDismiss={() => setNotice(null)}>{notice}</Banner>}
+
+            {confirmed ? (
+              <div className="stack">
+                <Banner kind="success">Your seats are booked. Enjoy the show.</Banner>
+                <div>
+                  <div className="muted">Booking reference</div>
+                  <div className="mono strong">{confirmed.id}</div>
+                </div>
+                <div>
+                  <div className="muted">Seats</div>
+                  <div>{confirmed.seats.map((seat) => seat.label).join(', ')}</div>
+                </div>
+                <div>
+                  <div className="muted">Total paid</div>
+                  <div className="strong">{formatMoney(confirmed.totalAmount)}</div>
+                </div>
+                <button type="button" className="btn btn-ghost" onClick={() => setConfirmed(null)}>
+                  Book more seats
+                </button>
+              </div>
+            ) : null}
 
             {hold ? (
               <>

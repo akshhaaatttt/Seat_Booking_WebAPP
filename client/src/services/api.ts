@@ -94,44 +94,7 @@ export const api = {
   confirmBooking: (showId: string, holdGroupId: string) =>
     call<{ booking: Booking }>(`/shows/${showId}/book`, body({ holdGroupId })).then((r) => r.booking),
 
-  listBookings: () => call<{ bookings: Booking[] }>('/bookings').then((r) => r.bookings),
 
-  getBooking: (bookingId: string) =>
-    call<{ booking: Booking }>(`/bookings/${bookingId}`).then((r) => r.booking),
 
-  cancelBooking: (bookingId: string) =>
-    call<{ booking: Booking }>(`/bookings/${bookingId}/cancel`, { method: 'POST' }).then((r) => r.booking),
 
-  admin: {
-    events: () => call<{ events: EventSummary[] }>('/admin/events').then((r) => r.events),
-    shows: () => call<{ shows: Show[] }>('/admin/shows').then((r) => r.shows),
-    seats: (showId: string) => call<SeatMap>(`/admin/shows/${showId}/seats`),
-    bookings: (params: { search?: string; status?: string; limit?: number; offset?: number } = {}) => {
-      const query = new URLSearchParams();
-      for (const [key, value] of Object.entries(params)) {
-        if (value !== undefined && value !== '') query.set(key, String(value));
-      }
-      const suffix = query.toString() ? `?${query}` : '';
-      return call<{ bookings: Booking[]; total: number; limit: number; offset: number }>(
-        `/admin/bookings${suffix}`,
-      );
-    },
-    createEvent: (input: { title: string; description: string; category: string; venue: string }) =>
-      call<{ event: EventSummary }>('/events', body(input)).then((r) => r.event),
-    updateEvent: (id: string, patch: Record<string, unknown>) =>
-      call<{ event: EventSummary }>(`/events/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }).then(
-        (r) => r.event,
-      ),
-    deleteEvent: (id: string) =>
-      call<{ deleted: boolean; event: EventSummary | null }>(`/events/${id}`, { method: 'DELETE' }),
-    createShow: (
-      eventId: string,
-      input: { startsAt: number; screen: string; layoutKey: string; basePrice: number },
-    ) => call<{ show: Show }>(`/events/${eventId}/shows`, body(input)).then((r) => r.show),
-    updateShow: (id: string, patch: Record<string, unknown>) =>
-      call<{ show: Show }>(`/shows/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }).then((r) => r.show),
-    deleteShow: (id: string) =>
-      call<{ deleted: boolean; show: Show | null }>(`/shows/${id}`, { method: 'DELETE' }),
-    layouts: () => call<{ layouts: { layoutKey: string; seatCount: number }[] }>('/admin/layouts').then((r) => r.layouts),
-  },
 };

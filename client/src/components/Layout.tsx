@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 export function Layout() {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const signOut = async (): Promise<void> => {
@@ -24,21 +24,10 @@ export function Layout() {
           <NavLink to="/" className="navlink" end>
             Events
           </NavLink>
-          {user && (
-            <NavLink to="/bookings" className="navlink">
-              My bookings
-            </NavLink>
-          )}
-          {isAdmin && (
-            <NavLink to="/admin" className="navlink">
-              Admin
-            </NavLink>
-          )}
           {user ? (
             <>
               <span className="faint" style={{ marginInline: 8 }}>
                 {user.name}
-                {isAdmin && <span className="badge badge-admin" style={{ marginLeft: 6 }}>Admin</span>}
               </span>
               <button type="button" className="btn btn-ghost btn-sm" onClick={signOut}>
                 Sign out

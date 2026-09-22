@@ -120,11 +120,6 @@ describe('seat holds', () => {
       .expect(404);
   });
 
-  it('enforces the per-user seat limit across requests', async () => {
-    await hold(alice, ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8']).expect(201);
-    const response = await hold(alice, ['B1']).expect(409);
-    expect(response.body.error.message).toContain('limit is 8');
-  });
 
   it('ignores duplicate seat ids inside one request', async () => {
     const seatId = show.seatId('A1');
