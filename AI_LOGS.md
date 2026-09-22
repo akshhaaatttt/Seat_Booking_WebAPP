@@ -202,6 +202,67 @@ This is recorded because reviewers should know the tree had more than one writer
 
 ---
 
+## Post-delivery — crash on shutdown with an open SSE stream
+
+Found while the user was running the app, not by the test suite.
+
+**Symptom.** The API process died with a native abort and did not come back, so
+every request through the Vite proxy failed with `ECONNREFUSED`:
+
+```
+void node::RemoveEnvironmentCleanupHook(...) at ../src/api/hooks.cc:142
+Assertion failed: (env) != nullptr
+ 4: Statement::~Statement() [better-sqlite3]
+```
+
+**Cause.** `server.ts` shut down like this:
+
+```ts
+server.close(() => { closeDb(); process.exit(0); });
+setTimeout(() => process.exit(0), 5000).unref();   // no closeDb()
+```
+
+`server.close()` waits for every open connection to end. An SSE stream is
+deliberately long-lived, so with a browser on the seat page the callback never
+fired. Five seconds later the backstop called `process.exit(0)` with the SQLite
+connection still open; V8 tore down the environment, and better-sqlite3's
+`Statement` destructors then aborted the process trying to remove cleanup hooks
+from a null environment.
+
+The real-time feature therefore guaranteed this crash on every restart — and
+because `SIGABRT` is not a file change, `tsx watch` never restarted the server.
+
+**Fix.** Shutdown now ends live connections so the close can complete, funnels
+every exit through one helper that closes the database first, guards against
+re-entry, and also covers `uncaughtException` / `unhandledRejection`:
+
+```ts
+const exitCleanly = (code: number) => { closeDb(); process.exit(code); };
+server.closeIdleConnections();
+server.closeAllConnections();
+server.close((err) => exitCleanly(err ? 1 : 0));
+setTimeout(() => exitCleanly(0), FORCED_EXIT_DELAY_MS).unref();
+```
+
+**Verification.** With two SSE streams open, `SIGTERM` now produces a clean
+shutdown — no assertion, port released, and it exits immediately rather than
+reaching the 5-second backstop, which confirms `closeAllConnections()` let
+`server.close()` finish. 134 tests still pass.
+
+**Honest caveat.** Attempts to reproduce the *old* crash on demand in a probe
+harness did not trigger it: killing the probe's `npx` wrapper terminated the
+node process before its exit path ran. So causation here is inferred from the
+mechanism, from the identical assertion seen earlier in the test workers (fixed
+the same way, by closing the handle explicitly), and from the fix holding under
+the exact conditions that crashed — not from a controlled A/B reproduction.
+
+**Lesson.** This is the same root cause as the test-worker crash logged above.
+Fixing it in the tests but not in the server was the mistake: a native handle
+must be released before `process.exit()` on **every** path, and any long-lived
+connection (SSE, WebSocket) makes a bare `server.close()` hang by design.
+
+---
+
 ## Verification summary
 
 | Check | Result |

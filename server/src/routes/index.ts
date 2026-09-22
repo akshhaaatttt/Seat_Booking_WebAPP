@@ -1,7 +1,5 @@
 import { Router } from 'express';
-import { adminRouter } from './adminRoutes.js';
 import { authRouter } from './authRoutes.js';
-import { bookingRouter } from './bookingRoutes.js';
 import { eventRouter } from './eventRoutes.js';
 import { holdRouter } from './holdRoutes.js';
 import { showRouter } from './showRoutes.js';
@@ -16,5 +14,3 @@ apiRouter.use('/auth', authRouter);
 apiRouter.use('/events', eventRouter);
 apiRouter.use('/shows', showRouter);
 apiRouter.use('/holds', holdRouter);
-apiRouter.use('/bookings', bookingRouter);
-apiRouter.use('/admin', adminRouter);
