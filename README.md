@@ -1,6 +1,6 @@
 # SeatBox
 
-Seat booking app: temporary holds, automatic expiry, live seat availability.
+Seat booking app: browse events, pick a show, hold seats, book them.
 
 ## Run
 
@@ -18,7 +18,7 @@ npm run dev
 | Command | |
 |---|---|
 | `npm run dev` | API `:4000` + client `:5173` |
-| `npm test` | 134 tests |
+| `npm test` | 38 tests |
 | `npm run typecheck` | Both workspaces |
 | `npm run build` | Compile + bundle |
 | `npm run db:reset` | Recreate and seed the database |
@@ -31,10 +31,9 @@ Settings: `server/.env` (see `server/.env.example`).
 
 Seed data only. Not for production.
 
-| | | |
-|---|---|---|
-| Admin | `admin@seatbox.dev` | `Admin@12345` |
-| User | `aria@example.com` | `User@12345` |
+| | |
+|---|---|
+| `aria@example.com` | `User@12345` |
 
 ## Docs
 
